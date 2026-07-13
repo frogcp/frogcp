@@ -2,3 +2,12 @@ packages:
   - "packages/*"
   - "examples/*"
   - "docs"
+
+# workerd (miniflare's Workers-runtime binary, used by the Cloudflare adapter's
+# tests) and its transitive sharp dependency both ship a postinstall build
+# script. pnpm 10 ignores build scripts by default for supply-chain safety, so
+# they're allowlisted here; without this, miniflare has no workerd binary to
+# spawn and every test that constructs a Miniflare fails.
+onlyBuiltDependencies:
+  - workerd
+  - sharp
