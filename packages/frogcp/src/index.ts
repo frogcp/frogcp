@@ -62,6 +62,19 @@ export { createBackend } from "./kernel";
 export type { Backend, CreateBackendOptions, FrogPlugin, FrogMiddleware, KernelContext } from "./kernel";
 export type { ApiVariables } from "./api/routes";
 
+// App descriptor plus shared serve core (bknd-style `defineApp` and connection
+// auto-resolution). `createBackend` stays the low-level escape hatch; these
+// remove the per-runtime boot ceremony, see `frogcp/adapter/*`.
+export { resolveConnection } from "./adapter/connection";
+export type { Connection, ConnectionResolver, D1Binding } from "./adapter/connection";
+export {
+  defineApp,
+  buildBackend,
+  createBackendMemo,
+  createServeHandler,
+} from "./adapter/serve";
+export type { App, RuntimeContext, OrResolver } from "./adapter/serve";
+
 // Ergonomic middleware-authoring alias, so plugin authors writing a
 // `FrogPlugin.middleware` don't have to hand-roll the `{ Variables: ApiVariables }`
 // generic or import `Context` from `hono`. `RequestContext` is the `c`
