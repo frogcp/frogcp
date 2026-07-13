@@ -11,6 +11,7 @@ export default defineConfig({
     "src/kv/index.ts",
     "src/mail/index.ts",
     "src/activity/index.ts",
+    "src/client/index.ts",
     "src/adapter/node/index.ts",
     "src/adapter/libsql/index.ts",
     "src/adapter/postgres/index.ts",
