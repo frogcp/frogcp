@@ -10,6 +10,7 @@
     "./kv": { "types": "./dist/kv/index.d.ts", "default": "./dist/kv/index.js" },
     "./mail": { "types": "./dist/mail/index.d.ts", "default": "./dist/mail/index.js" },
     "./activity": { "types": "./dist/activity/index.d.ts", "default": "./dist/activity/index.js" },
+    "./client": { "types": "./dist/client/index.d.ts", "default": "./dist/client/index.js" },
     "./adapter/node": { "types": "./dist/adapter/node/index.d.ts", "default": "./dist/adapter/node/index.js" },
     "./adapter/libsql": { "types": "./dist/adapter/libsql/index.d.ts", "default": "./dist/adapter/libsql/index.js" },
     "./adapter/postgres": { "types": "./dist/adapter/postgres/index.d.ts", "default": "./dist/adapter/postgres/index.js" },
