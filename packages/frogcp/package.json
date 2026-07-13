@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./adapter/node": { "types": "./dist/adapter/node/index.d.ts", "default": "./dist/adapter/node/index.js" }
+    "./adapter/node": { "types": "./dist/adapter/node/index.d.ts", "default": "./dist/adapter/node/index.js" },
+    "./adapter/libsql": { "types": "./dist/adapter/libsql/index.d.ts", "default": "./dist/adapter/libsql/index.js" }
   },
   "types": "./dist/index.d.ts",
   "engines": {
@@ -22,7 +23,14 @@
     "hono": "^4.12.27",
     "zod": "^4.4.3"
   },
+  "peerDependencies": {
+    "@libsql/client": "^0.17.4"
+  },
+  "peerDependenciesMeta": {
+    "@libsql/client": { "optional": true }
+  },
   "devDependencies": {
+    "@libsql/client": "^0.17.4",
     "@types/node": "^26.1.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
