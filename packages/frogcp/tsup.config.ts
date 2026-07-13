@@ -10,6 +10,7 @@ export default defineConfig({
     "src/adapter/libsql/index.ts",
     "src/adapter/postgres/index.ts",
     "src/adapter/postgres/testing/ephemeral-postgres.ts",
+    "src/adapter/cloudflare/index.ts",
   ],
   format: ["esm"],
   dts: true,
