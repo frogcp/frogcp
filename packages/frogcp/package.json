@@ -9,7 +9,8 @@
     "./adapter/libsql": { "types": "./dist/adapter/libsql/index.d.ts", "default": "./dist/adapter/libsql/index.js" },
     "./adapter/postgres": { "types": "./dist/adapter/postgres/index.d.ts", "default": "./dist/adapter/postgres/index.js" },
     "./adapter/postgres/testing": { "types": "./dist/adapter/postgres/testing/ephemeral-postgres.d.ts", "default": "./dist/adapter/postgres/testing/ephemeral-postgres.js" },
-    "./adapter/cloudflare": { "types": "./dist/adapter/cloudflare/index.d.ts", "default": "./dist/adapter/cloudflare/index.js" }
+    "./adapter/cloudflare": { "types": "./dist/adapter/cloudflare/index.d.ts", "default": "./dist/adapter/cloudflare/index.js" },
+    "./adapter/nextjs": { "types": "./dist/adapter/nextjs/index.d.ts", "default": "./dist/adapter/nextjs/index.js" }
   },
   "types": "./dist/index.d.ts",
   "engines": {
@@ -28,18 +29,24 @@
   },
   "peerDependencies": {
     "@libsql/client": "^0.17.4",
+    "@opennextjs/cloudflare": "^1.0.0",
+    "next": ">=14",
     "pg": "^8.22.0"
   },
   "peerDependenciesMeta": {
     "@libsql/client": { "optional": true },
+    "@opennextjs/cloudflare": { "optional": true },
+    "next": { "optional": true },
     "pg": { "optional": true }
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260706.1",
     "@libsql/client": "^0.17.4",
+    "@opennextjs/cloudflare": "^1.0.0",
     "@types/node": "^26.1.0",
     "@types/pg": "^8.20.0",
     "miniflare": "^4.20260701.0",
+    "next": "^16.0.0",
     "pg": "^8.22.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",

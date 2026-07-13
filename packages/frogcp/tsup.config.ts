@@ -11,9 +11,14 @@ export default defineConfig({
     "src/adapter/postgres/index.ts",
     "src/adapter/postgres/testing/ephemeral-postgres.ts",
     "src/adapter/cloudflare/index.ts",
+    "src/adapter/nextjs/index.ts",
   ],
   format: ["esm"],
   dts: true,
   sourcemap: true,
   outDir: "dist",
+  // A subpath module that imports core (frogcp) or a sibling
+  // (frogcp/adapter/node) must reference it as the package at runtime, not
+  // inline a second copy, so mark every frogcp* specifier external.
+  external: [/^frogcp(\/.*)?$/],
 });
