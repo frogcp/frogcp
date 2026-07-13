@@ -6,6 +6,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: [
     "src/index.ts",
+    "src/auth/index.ts",
     "src/adapter/node/index.ts",
     "src/adapter/libsql/index.ts",
     "src/adapter/postgres/index.ts",
