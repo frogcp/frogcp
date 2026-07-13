@@ -1,0 +1,368 @@
+---
+title: Writing a plugin
+description: How to extend frogCP with a plugin, a database or storage adapter, and a mail transport, grounded in the real interfaces.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+frogCP is a small kernel with a set of extension points. Everything past the
+kernel is a plugin: auth, media, kv, mail, and activity are all plugins, and so
+is anything you write. The extension points are small interfaces, so most
+additions are a single file or a standalone package, with no kernel change.
+
+This guide covers the three things you are most likely to write:
+
+- a **plugin**, to add entities, routes, middleware, or boot work;
+- an **adapter**, to run frogCP against a different database, blob store, or
+  key/value store;
+- a **transport**, to send mail through a different provider.
+
+<Aside title="Community packages">
+  A plugin, adapter, or transport does not have to live in your app. It can be
+  its own npm package that depends on `frogcp`. Name community packages
+  `frogcp-*` (for example `frogcp-stripe` or `frogcp-s3-storage`) so they are
+  easy to find.
+</Aside>
+
+## Writing a plugin
+
+A plugin is a plain object. The kernel merges it into a backend through
+`createBackend`'s `plugins` array, in order. Every hook is optional, so a
+plugin can be as small as "just some entities".
+
+Here is the interface, from `frogcp`:
+
+```ts
+import type { Hono } from "hono";
+import type { EntityDef, KernelContext, FrogMiddleware, ApiVariables } from "frogcp";
+
+interface FrogPlugin {
+  name: string;
+  /** Entity defs (build with `resolveEntities`) merged into the config at boot. */
+  entities?: Record<string, EntityDef>;
+  /** Resolves the caller's identity. Only the first plugin providing this is used. */
+  identify?: (req: Request) => Promise<Ctx> | Ctx;
+  /** Onion middleware wrapping every route, plugin and core. */
+  middleware?: FrogMiddleware;
+  /** Registers routes on the kernel's Hono app, before the core `/api` routes. */
+  routes?: (app: Hono<{ Variables: ApiVariables }>, ctx: KernelContext) => void;
+  /** Runs once at boot, in array order, before any plugin's routes are registered. */
+  onBoot?: (ctx: KernelContext) => void | Promise<void>;
+}
+```
+
+The convention is to expose a plugin as a factory function that takes its
+options and returns the object. Here is a small plugin that adds a health route
+and logs once at boot:
+
+```ts
+import type { FrogPlugin } from "frogcp";
+
+export function healthPlugin(): FrogPlugin {
+  return {
+    name: "health",
+    onBoot(ctx) {
+      ctx.logger.info("health: ready");
+    },
+    routes(app) {
+      app.get("/health", (c) => c.json({ ok: true }));
+    },
+  };
+}
+```
+
+Wire it in like any other plugin:
+
+```ts
+import { createBackend } from "frogcp";
+import { nodeSqliteAdapter } from "frogcp/adapter/node";
+import config from "./backend.config";
+
+const backend = await createBackend({
+  config,
+  adapter: nodeSqliteAdapter("data.sqlite"),
+  plugins: [healthPlugin()],
+});
+```
+
+### Contributing entities
+
+A plugin can define its own entities the same way an app config does. Build
+them with `resolveEntities` so they merge into the backend's schema at boot:
+
+```ts
+import { entity, resolveEntities, text, timestamp, type FrogPlugin } from "frogcp";
+
+export function auditLogPlugin(): FrogPlugin {
+  return {
+    name: "audit-log",
+    entities: resolveEntities({
+      audit_events: entity({
+        action: text().required(),
+        actor: text().required(),
+        at: timestamp().auto(),
+      }),
+    }),
+  };
+}
+```
+
+### A few things worth knowing
+
+- **Middleware is onion-shaped.** It runs in `plugins` array order on the way
+  in and unwinds in reverse on the way out. It runs after the kernel sets the
+  identity and request logger, so it can read `c.get("ctx")` and
+  `c.get("logger")`. A middleware may return a `Response` without calling
+  `next()` to short-circuit routing.
+- **`identify` is first-wins.** Only the first plugin in the array that
+  provides `identify` is used, so order it ahead of anything that assumes an
+  identity.
+- **Self-skipping factories.** A plugin that is inert without an optional
+  dependency should make that dependency optional and return `false` when it is
+  missing. The kernel skips falsy `plugins` entries, so callers can pass
+  `kvPlugin(maybeStore)` with no guard.
+
+## Writing an adapter
+
+An adapter is how frogCP reaches a specific database, blob store, or key/value
+store. Each one is a small interface, so a new backend is usually one function
+that returns the interface.
+
+### Storage adapter
+
+A `StorageAdapter` is a blob store: local disk, R2, S3, and so on. It is
+`Uint8Array`-based and has no `node:Buffer` or `ReadableStream` requirement, so
+one implementation runs unchanged on Node and on Workers.
+
+```ts
+interface StorageAdapter {
+  /** Writes `data` under `key`, overwriting any existing object. */
+  put(key: string, data: Uint8Array, meta?: { contentType?: string }): Promise<void>;
+  /** Returns the object's bytes, or `null` if `key` does not exist. */
+  get(key: string): Promise<Uint8Array | null>;
+  /** Removes the object at `key`; a no-op if it does not exist. */
+  delete(key: string): Promise<void>;
+  /** A public URL for `key`, when the store can produce one directly. */
+  url?(key: string): string | undefined;
+}
+```
+
+The in-memory reference implementation is a `Map`. Notice it leaves `url` off
+entirely, since an in-memory store has no servable address:
+
+```ts
+import type { StorageAdapter } from "frogcp";
+
+export function memoryStorage(): StorageAdapter {
+  const store = new Map<string, Uint8Array>();
+  return {
+    async put(key, data) {
+      store.set(key, data);
+    },
+    async get(key) {
+      return store.get(key) ?? null;
+    },
+    async delete(key) {
+      store.delete(key);
+    },
+  };
+}
+```
+
+### Key/value adapter
+
+A `KvStore` is a general-purpose key/value store with optional per-key TTL:
+Cloudflare KV, a SQLite table, Redis, an in-memory `Map`. Values are strings;
+encode structured values as JSON.
+
+```ts
+interface KvPutOptions {
+  /** Seconds-to-live; omit for no expiry. */
+  expirationTtl?: number;
+}
+
+interface KvStore {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string, opts?: KvPutOptions): Promise<void>;
+  delete(key: string): Promise<void>;
+  /** Optional: the keys currently stored under `prefix`. Best-effort. */
+  list?(prefix: string): Promise<string[]>;
+}
+```
+
+The `frogcp/kv` plugin surfaces a `KvStore` as `ctx.kv`, but a `KvStore` also
+works standalone. Here is a minimal in-memory one with TTL:
+
+```ts
+import type { KvStore } from "frogcp";
+
+export function memoryKv(): KvStore {
+  const store = new Map<string, { value: string; expiresAt?: number }>();
+  return {
+    async get(key) {
+      const hit = store.get(key);
+      if (!hit) return null;
+      if (hit.expiresAt !== undefined && hit.expiresAt < Date.now()) {
+        store.delete(key);
+        return null;
+      }
+      return hit.value;
+    },
+    async put(key, value, opts) {
+      const entry =
+        opts?.expirationTtl !== undefined
+          ? { value, expiresAt: Date.now() + opts.expirationTtl * 1000 }
+          : { value };
+      store.set(key, entry);
+    },
+    async delete(key) {
+      store.delete(key);
+    },
+  };
+}
+```
+
+### Database adapter
+
+A `DatabaseAdapter` is a runtime-agnostic handle to a database frogCP runs
+migrations and queries against. It is a discriminated union on `dialect`, so a
+caller that narrows on `adapter.dialect` gets a correctly typed `adapter.db`:
+
+```ts
+interface SqliteDatabaseAdapter {
+  dialect: "sqlite";
+  db: BaseSQLiteDatabase<"sync" | "async", unknown, Record<string, never>>;
+  exec(sql: string): Promise<void>;
+}
+
+interface PostgresDatabaseAdapter {
+  dialect: "postgres";
+  db: PgDatabase<PgQueryResultHKT, Record<string, never>>;
+  exec(sql: string): Promise<void>;
+}
+
+type DatabaseAdapter = SqliteDatabaseAdapter | PostgresDatabaseAdapter;
+```
+
+A concrete adapter builds `db` from a driver-specific Drizzle instance and
+implements `exec` for raw DDL. `exec` and `db` must operate on the same single
+connection: migration atomicity relies on `exec("BEGIN")` and `exec("COMMIT")`
+wrapping statements that run through `db`, so if they used different pooled
+connections the transaction would silently do nothing.
+
+frogCP already ships adapters for `node:sqlite`, libSQL, Postgres, and D1, so
+you rarely need to write one. When you do, start from an existing adapter such
+as `frogcp/adapter/node` and swap the driver.
+
+## Writing a transport
+
+A mail transport is the smallest extension point in frogCP: one function that
+takes a message and delivers it.
+
+```ts
+interface MailMessage {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+}
+
+type MailTransport = (message: MailMessage) => Promise<void>;
+```
+
+A transport should **throw on failure**. The caller decides whether delivery is
+best-effort or fatal, so a transport's only job is to deliver or raise.
+
+### Worked example: a mail transport
+
+Here is a transport for [Resend](https://resend.com), modeled on the shape of
+the built-in `resendTransport`. It is plain `fetch`, so the same code runs on
+Node and on Cloudflare Workers.
+
+<Steps>
+
+1. **Define the options.** Take the API key, and a `fetchImpl` seam so tests
+   can pass a fake `fetch`:
+
+   ```ts
+   import type { MailMessage, MailTransport } from "frogcp/mail";
+
+   export interface ResendOptions {
+     apiKey: string;
+     /** Test seam; defaults to `globalThis.fetch`. */
+     fetchImpl?: typeof fetch;
+   }
+   ```
+
+2. **Return the transport.** POST the message to the provider and throw if the
+   response is not ok:
+
+   ```ts
+   export function resendTransport(opts: ResendOptions): MailTransport {
+     const doFetch = opts.fetchImpl ?? globalThis.fetch;
+     return async function resendMail(message: MailMessage): Promise<void> {
+       const res = await doFetch("https://api.resend.com/emails", {
+         method: "POST",
+         headers: {
+           authorization: `Bearer ${opts.apiKey}`,
+           "content-type": "application/json",
+         },
+         body: JSON.stringify({
+           from: message.from,
+           to: [message.to],
+           subject: message.subject,
+           text: message.text,
+         }),
+       });
+       if (!res.ok) throw new Error(`resend: HTTP ${res.status} sending to ${message.to}`);
+     };
+   }
+   ```
+
+3. **Hand it to the mail plugin.** `mailPlugin` takes a default `from` and a
+   transport, and exposes a `mailer` other plugins can send through:
+
+   ```ts
+   import { mailPlugin } from "frogcp/mail";
+
+   const mail = mailPlugin({
+     from: "Acme <noreply@acme.com>",
+     transport: resendTransport({ apiKey: process.env.RESEND_API_KEY! }),
+   });
+
+   // in createBackend({ plugins: [mail, /* ... */] })
+   ```
+
+</Steps>
+
+For local development, `frogcp/mail` ships `consoleTransport`, which writes the
+whole message to the console instead of sending it, so password-reset links
+land in your terminal with no provider account. The kernel also ships transports
+for Cloudflare Email Service, over both a Worker binding and its REST API.
+
+### Testing a transport
+
+Because the transport takes a `fetchImpl`, a test needs no network and no
+mocks beyond a stub `fetch`:
+
+```ts
+import { expect, test } from "vitest";
+import { resendTransport } from "./resend";
+
+test("throws on a non-ok response", async () => {
+  const send = resendTransport({
+    apiKey: "test",
+    fetchImpl: async () => new Response(null, { status: 500 }),
+  });
+  await expect(
+    send({ from: "a@x.com", to: "b@y.com", subject: "hi", text: "yo" }),
+  ).rejects.toThrow(/HTTP 500/);
+});
+```
+
+## Publishing as a package
+
+Any of the above can ship as its own npm package that depends on `frogcp`.
+Name it `frogcp-*`, export the factory, and keep the interface as the only
+coupling to the framework. A user installs it and wires it in exactly like a
+first-party plugin, adapter, or transport.
