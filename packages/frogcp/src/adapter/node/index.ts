@@ -3,16 +3,15 @@ import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import type { SqliteDatabaseAdapter } from "frogcp";
 
-// Test-only sqlite adapter. The real `frogcp/adapter/node` lands in a later PR;
-// the core suite needs a working DatabaseAdapter to run against, so this is a
-// faithful copy of that adapter's sqlite arm, scoped to the test tree. Once the
-// node adapter is migrated, these tests should import `nodeSqliteAdapter` from
-// it and this fixture can be deleted.
+export { memoryStorage } from "./storage";
+export { memorySessionStore } from "./session";
+export { nodeKv, type NodeKvOptions } from "./kv";
 
-// SQLite extended result codes the data engine recognizes. node:sqlite reports
-// every failure with `code: "ERR_SQLITE_ERROR"` and the extended code in a
-// numeric `errcode`; better-sqlite3 exposed it as a string `code`. Remap the
-// constraint codes the engine cares about so its detection keeps working.
+// SQLite extended result codes the data engine recognizes (see
+// isForeignKeyViolation / isUniqueViolation in frogcp). node:sqlite reports
+// every failure with code "ERR_SQLITE_ERROR" and the extended code in a numeric
+// errcode; better-sqlite3 exposed it as a string code. Remap the constraint
+// codes the engine cares about so its detection keeps working.
 const SQLITE_ERRCODE_TO_CODE: Record<number, string> = {
   787: "SQLITE_CONSTRAINT_FOREIGNKEY", // dangling reference on INSERT/UPDATE
   1811: "SQLITE_CONSTRAINT_TRIGGER", // ON DELETE RESTRICT (raised via FK trigger)
@@ -29,11 +28,10 @@ function translateError(error: unknown): unknown {
 }
 
 // A row that satisfies both consumers of the sqlite-proxy callback: drizzle's
-// `mapResultRow` indexes rows positionally (join-safe with duplicate column
-// names), while raw `db.all`/`db.get` expect named access. Returning the
-// positional array with the column names grafted on as extra properties serves
-// both. Numeric names and `length` are skipped so an alias can never corrupt
-// the array itself.
+// mapResultRow indexes rows positionally (join-safe with duplicate column
+// names), while raw db.all/db.get expect named access. Returning the positional
+// array with the column names grafted on as extra properties serves both.
+// Numeric names and length are skipped so an alias can never corrupt the array.
 function hybridRow(values: unknown[], names: string[]): unknown[] {
   const row = values as unknown[] & Record<string, unknown>;
   for (let i = 0; i < names.length; i++) {
@@ -71,8 +69,8 @@ export function nodeSqliteAdapter(path: string | ":memory:"): SqliteDatabaseAdap
       const rows = (stmt.all(...args) as unknown as unknown[][]).map((values) =>
         hybridRow(values, names),
       );
-      // sqlite-proxy's `get` contract: `rows` is the single row itself (empty
-      // array when there is no row), not an array of rows.
+      // sqlite-proxy's get contract: rows is the single row itself (empty array
+      // when there is no row), not an array of rows.
       if (method === "get") return { rows: rows[0] ?? [] };
       return { rows };
     } catch (error) {
@@ -92,3 +90,6 @@ export function nodeSqliteAdapter(path: string | ":memory:"): SqliteDatabaseAdap
     },
   };
 }
+
+/** @deprecated use nodeSqliteAdapter */
+export const betterSqlite3Adapter = nodeSqliteAdapter;

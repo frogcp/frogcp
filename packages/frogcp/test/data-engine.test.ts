@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sql } from "drizzle-orm";
-import { nodeSqliteAdapter } from "./support/node-sqlite-adapter";
+import { nodeSqliteAdapter } from "frogcp/adapter/node";
 import {
   defineBackend,
   entity,

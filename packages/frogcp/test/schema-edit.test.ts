@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { nodeSqliteAdapter } from "./support/node-sqlite-adapter";
+import { nodeSqliteAdapter } from "frogcp/adapter/node";
 import {
   createBackend,
   defineBackend,
