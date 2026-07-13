@@ -3,9 +3,14 @@
   "version": "0.0.0",
   "license": "Apache-2.0",
   "type": "module",
+  "bin": {
+    "frogcp": "./dist/cli/index.js"
+  },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./auth": { "types": "./dist/auth/index.d.ts", "default": "./dist/auth/index.js" },
+    "./cli": { "types": "./dist/cli/index.d.ts", "default": "./dist/cli/index.js" },
+    "./codegen": { "types": "./dist/codegen/index.d.ts", "default": "./dist/codegen/index.js" },
     "./media": { "types": "./dist/media/index.d.ts", "default": "./dist/media/index.js" },
     "./kv": { "types": "./dist/kv/index.d.ts", "default": "./dist/kv/index.js" },
     "./mail": { "types": "./dist/mail/index.d.ts", "default": "./dist/mail/index.js" },
@@ -28,10 +33,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.8",
     "@noble/hashes": "^2.2.0",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "^0.45.2",
+    "esbuild": "^0.27.7",
     "hono": "^4.12.27",
+    "jiti": "^2.7.0",
     "jose": "^6.2.3",
     "zod": "^4.4.3"
   },
