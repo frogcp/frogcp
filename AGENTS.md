@@ -39,14 +39,14 @@ you do not need a built dist to run them.
 
 ## Architecture
 
-A request flows through the kernel: identity resolution, then a permission
-check that compiles to a SQL `WHERE`, then the data engine (Drizzle), then the
-adapter. Observability sinks run on the side.
+A request flows through the kernel: identity resolution, then a permission check
+that compiles to a SQL `WHERE`, then the data engine (Drizzle), then the adapter.
+Observability sinks run on the side.
 
 The entity DSL (`defineBackend`, `entity`, `text`, `select`, ...) compiles to a
 Drizzle schema and a migration. Permissions like `rule.owner("owner")` become
-`WHERE owner = :current_user_id`, so row-level access is enforced in the
-database, not in application code.
+`WHERE owner = :current_user_id`, so row-level access is enforced in the database,
+not in application code.
 
 Every capability past the kernel is a plugin. A plugin is a plain object with
 some of: `entities`, `middleware`, `onBoot`, and routes. Auth, media, kv, mail,
@@ -56,31 +56,13 @@ and activity are all just plugins. So is anything you write.
 
 Match the surrounding code. Beyond that:
 
-**Comments.** Explain why, not what. If the code already says it, do not
-comment it. Keep comments to a line or two. Save longer notes for a genuinely
-non-obvious decision or a public API doc.
-
-- No em-dashes. Use commas, parentheses, colons, or two sentences.
-- No filler: drop "on purpose", "load-bearing", "crucially", "note that",
-  "importantly", and ALL-CAPS for emphasis.
-- Write like a teammate leaving a short note, not an essay.
-
-Before:
-```
-// These specifiers are routed through module-scope `const`s rather than passed
-// as string LITERALS to `import()` on purpose: esbuild eagerly resolves and
-// inlines whatever a dynamic `import()`'s argument constant-folds to —
-// INCLUDING a plain literal — so a literal here would drag pg into every bundle.
-```
-After:
-```
-// Import through a variable, not a literal. esbuild inlines literal dynamic
-// imports, which would pull pg/libsql/node:sqlite into every Worker bundle.
-```
+**Comments.** Explain why, not what. If the code already says it, do not comment
+it. Keep comments to a line or two, and save longer notes for a genuinely
+non-obvious decision or a public API doc. Write like a teammate leaving a short
+note, not an essay.
 
 **TypeScript.** Strict, with `exactOptionalPropertyTypes`. Build optional object
-fields with conditional spreads, not `key: undefined`. No `.js` import
-extensions.
+fields with conditional spreads, not `key: undefined`. No `.js` import extensions.
 
 **Naming.** Plain and direct. Prefer a clear name over a comment.
 
@@ -115,18 +97,12 @@ trailing period. Common types are `feat`, `fix`, `refactor`, `test`, `docs`,
 `chore`. For example, `feat(auth): add email and password login`.
 
 Branch names follow the same shape: `type/short-name`, for example `feat/auth` or
-`fix/list-query-sort`.
-
-Describe the change itself. Never reference an old repo, a port, a migration, a
-comment cleanup, or removing em-dashes in a branch name, commit, or PR. None of
-that is part of this project's story.
+`fix/list-query-sort`. Describe the change itself.
 
 ## Notes for agents
 
 - Read the neighboring files first and follow their patterns.
-- Follow the house style exactly, especially the comment rules above. Do not
-  reintroduce em-dashes or essay comments.
 - Keep changes scoped to the task. If you find unrelated cleanup, mention it
   rather than folding it in.
-- Run the tests and typecheck before you call something done, and say plainly
-  if something fails.
+- Run the tests and typecheck before you call something done, and say plainly if
+  something fails.
