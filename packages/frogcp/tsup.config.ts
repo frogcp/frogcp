@@ -4,7 +4,13 @@ import { defineConfig } from "tsup";
 // and ships as a subpath export (frogcp/auth, frogcp/adapter/node, and so on).
 // Entries get added here as modules are migrated in.
 export default defineConfig({
-  entry: ["src/index.ts", "src/adapter/node/index.ts", "src/adapter/libsql/index.ts"],
+  entry: [
+    "src/index.ts",
+    "src/adapter/node/index.ts",
+    "src/adapter/libsql/index.ts",
+    "src/adapter/postgres/index.ts",
+    "src/adapter/postgres/testing/ephemeral-postgres.ts",
+  ],
   format: ["esm"],
   dts: true,
   sourcemap: true,
