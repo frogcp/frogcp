@@ -1,0 +1,51 @@
+---
+title: frogCP
+description: An open-source backend framework. Typed entities, a REST API, a typed client, an admin UI, and permissions compiled to SQL.
+template: splash
+hero:
+  tagline: Define your data as typed entities and get a REST API, a typed client, an admin UI, and row-level permissions compiled to SQL.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Writing a plugin
+      link: /guides/plugins/
+      icon: open-book
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## What frogCP is
+
+frogCP is a small microkernel plus plugins. You describe your entities with a
+typed DSL, and the kernel gives you a REST API, a typed client, and permissions
+that compile to SQL. Database and runtime adapters are swappable, so the same
+app runs on node:sqlite, libSQL, D1, or Postgres.
+
+<CardGrid>
+  <Card title="Entities to SQL" icon="seti:db">
+    The entity DSL compiles to a Drizzle schema and a migration. Rules like
+    `rule.owner("owner")` become a SQL `WHERE`, so access is enforced in the
+    database, not in application code.
+  </Card>
+  <Card title="Everything is a plugin" icon="puzzle">
+    Auth, media, kv, mail, and activity are plugins. A plugin is a plain object
+    with some of `entities`, `middleware`, `routes`, and `onBoot`. So is
+    anything you write.
+  </Card>
+  <Card title="Swappable adapters" icon="random">
+    A database or storage adapter is a small interface. The same code runs on
+    Node and on Cloudflare Workers by changing one adapter.
+  </Card>
+  <Card title="Typed client" icon="laptop">
+    `frogcp/client` gives you a typed client generated from your entities, so
+    the frontend and backend stay in sync.
+  </Card>
+</CardGrid>
+
+## Next
+
+- [Getting started](/getting-started/) builds a small backend end to end.
+- [Writing a plugin](/guides/plugins/) covers plugins, adapters, and mail
+  transports, grounded in the real interfaces.
