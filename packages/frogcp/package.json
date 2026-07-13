@@ -6,6 +6,7 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./auth": { "types": "./dist/auth/index.d.ts", "default": "./dist/auth/index.js" },
+    "./media": { "types": "./dist/media/index.d.ts", "default": "./dist/media/index.js" },
     "./adapter/node": { "types": "./dist/adapter/node/index.d.ts", "default": "./dist/adapter/node/index.js" },
     "./adapter/libsql": { "types": "./dist/adapter/libsql/index.d.ts", "default": "./dist/adapter/libsql/index.js" },
     "./adapter/postgres": { "types": "./dist/adapter/postgres/index.d.ts", "default": "./dist/adapter/postgres/index.js" },
