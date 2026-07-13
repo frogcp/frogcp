@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { nodeSqliteAdapter } from "./support/node-sqlite-adapter";
+import { nodeSqliteAdapter } from "frogcp/adapter/node";
 import {
   createBackend,
   defineBackend,
