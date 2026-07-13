@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "frogcp": ["./src/index.ts"],
+      "frogcp/*": ["./src/*/index.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}
