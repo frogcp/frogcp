@@ -6,6 +6,11 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
+  test: {
+    // The CLI tests load configs through jiti that import the `frogcp` package,
+    // which resolves to dist, so make sure a build exists before they run.
+    globalSetup: ["./test/support/ensure-build.ts"],
+  },
   resolve: {
     alias: [
       { find: /^frogcp\/(.+)$/, replacement: `${root}src/$1/index.ts` },
