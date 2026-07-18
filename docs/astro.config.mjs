@@ -16,8 +16,12 @@ export default defineConfig({
           items: [{ label: "Getting started", slug: "getting-started" }],
         },
         {
+          label: "Concepts",
+          items: [{ autogenerate: { directory: "concepts" } }],
+        },
+        {
           label: "Guides",
-          items: [{ label: "Writing a plugin", slug: "guides/plugins" }],
+          items: [{ autogenerate: { directory: "guides" } }],
         },
       ],
     }),
