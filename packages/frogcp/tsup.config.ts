@@ -23,6 +23,8 @@ export default defineConfig({
     "src/adapter/postgres/testing/ephemeral-postgres.ts",
     "src/adapter/cloudflare/index.ts",
     "src/adapter/nextjs/index.ts",
+    "src/sink/sqlite/index.ts",
+    "src/otel/index.ts",
   ],
   format: ["esm"],
   dts: true,
