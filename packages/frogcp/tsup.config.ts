@@ -17,6 +17,7 @@ export default defineConfig({
     "src/client/index.ts",
     "src/cli/index.ts",
     "src/codegen/index.ts",
+    "src/conformance/index.ts",
     "src/adapter/node/index.ts",
     "src/adapter/libsql/index.ts",
     "src/adapter/postgres/index.ts",
