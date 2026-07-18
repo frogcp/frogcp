@@ -16,8 +16,5 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The CLI tests load configs that import the built `frogcp` package, so the
-      # framework must be built before the suite runs.
-      - run: pnpm --filter frogcp build
       - run: pnpm -r typecheck
       - run: pnpm -r test
