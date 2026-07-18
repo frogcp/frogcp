@@ -2,7 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "allowJs": true
+    "allowJs": true,
+    "baseUrl": ".",
+    // Resolve the framework from source. Without this, `frogcp` resolves through
+    // the package exports to dist and typechecking would depend on a prior build.
+    "paths": {
+      "frogcp": ["../frogcp/src/index.ts"],
+      "frogcp/*": ["../frogcp/src/*/index.ts"]
+    }
   },
   "include": [
     "src",

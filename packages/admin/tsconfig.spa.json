@@ -13,7 +13,11 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./spa/*"]
+      "@/*": ["./spa/*"],
+      // The screen tests import framework types. Resolve them from source so
+      // typechecking does not depend on a prior build of the sibling package.
+      "frogcp": ["../frogcp/src/index.ts"],
+      "frogcp/*": ["../frogcp/src/*/index.ts"]
     }
   },
   "include": [
