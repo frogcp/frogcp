@@ -76,14 +76,15 @@ the first time you start the server.
 
 ## Talk to the API
 
-Every entity gets REST routes under `/api`. Create a note and list it back:
+Every entity gets REST routes under `/api/entity/<name>`. Create a note and list
+it back:
 
 ```bash
-curl -X POST http://localhost:3000/api/notes \
+curl -X POST http://localhost:3000/api/entity/notes \
   -H "content-type: application/json" \
   -d '{"title":"First note","body":"hello","owner":"me"}'
 
-curl http://localhost:3000/api/notes
+curl http://localhost:3000/api/entity/notes
 ```
 
 ## Where to go next
