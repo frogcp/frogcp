@@ -1,0 +1,23 @@
+{
+  "name": "example-basic-node",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "typecheck": "node scripts/ensure-deps-built.mjs && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@frogcp/admin": "workspace:*",
+    "@hono/node-server": "^2.0.8",
+    "frogcp": "workspace:*",
+    "hono": "^4.12.27"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
