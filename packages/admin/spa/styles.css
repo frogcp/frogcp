@@ -1,0 +1,225 @@
+/* ============================================================================
+   frogCP Design System: Tailwind v4 + shadcn/ui theme for @frogcp/admin.
+   Brand tokens, then the shadcn semantic slots mapped from them, with a light
+   "paper" default and a dark "cool-ink" `.dark` pair.
+
+   Fonts arrive through the `@import url(...)` below rather than an
+   `index.html` `<link>` (see that file's comment for why), so the font vars
+   name the families directly.
+   ========================================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* ── Brand palette ─────────────────────────────────────────────────── */
+  --frog-500: #2fae63; /* primary, the frog green */
+  --frog-600: #259253; /* hover / pressed on light */
+  --frog-400: #5fd68f; /* on dark surfaces */
+  --frog-100: #dcf1e5; /* tint fills, quiet chips */
+  --frog-50: #eef8f2; /* faint wash */
+
+  --violet-500: #5e2bff; /* Pond accent: secondary, use sparingly */
+  --violet-400: #8b6bff;
+  --violet-100: #e7e0ff;
+
+  /* ── Ink & paper (green-tinted neutrals) ─────────── */
+  --ink-900: #10201a; /* near-black, text + dark shell */
+  --ink-800: #0e2018; /* dark surface */
+  --ink-700: #1c3128;
+  --ink-500: #47564e;
+  --ink-400: #6f7a71; /* muted label / caption */
+  --ink-300: #9aa79e;
+  --ink-200: #d3d8d0;
+  --line: #e0e3dc; /* hairline borders */
+  --line-soft: #e6e8e2;
+  --paper: #f6f7f4; /* app background */
+  --paper-raised: #ffffff;
+  --white: #ffffff;
+
+  --danger: #d6453b;
+  --warning: #e0952b;
+  --success: var(--frog-500);
+  --info: var(--violet-500);
+
+  /* frogCP-specific roles with no shadcn equivalent slot. */
+  --logo-pupil: var(--ink-900); /* frog-mark eye pupils */
+  --bg-tint: var(--frog-50); /* active-nav pill, empty-state icon wash */
+  --bg-tint-border: var(--frog-100);
+  --accent-ink: var(--frog-600); /* "text-on-tint": CopyField value, active nav text */
+  --border-hover: #cbd3c9;
+  --shadow-elevated: 0 14px 32px -16px rgba(16, 32, 26, 0.22);
+
+  /* Status roles; see components/ui/StatusPill.tsx. */
+  --status-success-text: var(--accent-ink);
+  --status-success-bg: var(--bg-tint);
+  --status-success-dot: var(--frog-500);
+  --status-warning-text: #b4741b;
+  --status-warning-bg: rgba(224, 149, 43, 0.14);
+  --status-warning-dot: #e0952b;
+  --status-danger-text: #c13c33;
+  --status-danger-bg: rgba(214, 69, 59, 0.08);
+  --status-danger-dot: #d6453b;
+  --status-danger-border: rgba(214, 69, 59, 0.3);
+  --status-neutral-text: var(--ink-400);
+  --status-neutral-bg: var(--line-soft);
+  --status-neutral-dot: var(--ink-300);
+
+  /* ── shadcn semantic slots, mapped ONCE from the brand tokens above.
+     Light "paper" theme; see `.dark` below for "cool-ink". ─────────── */
+  --radius: 0.75rem;
+
+  --background: var(--paper);
+  --foreground: var(--ink-900);
+  --card: var(--paper-raised);
+  --card-foreground: var(--ink-900);
+  --popover: var(--paper-raised);
+  --popover-foreground: var(--ink-900);
+
+  --primary: var(--frog-500);
+  --primary-foreground: var(--white);
+
+  --secondary: var(--line-soft);
+  --secondary-foreground: var(--ink-900);
+  --muted: var(--line-soft);
+  --muted-foreground: var(--ink-400);
+  --accent: var(--line-soft);
+  --accent-foreground: var(--ink-900);
+
+  --destructive: var(--danger);
+  --destructive-foreground: var(--white);
+
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--frog-500);
+}
+
+/* ── Cool-ink dark theme. Only the SEMANTIC layer flips; the raw palette above
+   stays fixed (frog-400 already IS the design's dark-mode green). Toggled by
+   adding/removing `.dark` on `<html>`, see `spa/lib/theme.ts`. */
+.dark {
+  --bg-tint: rgba(95, 214, 143, 0.13);
+  --bg-tint-border: rgba(95, 214, 143, 0.26);
+  --logo-pupil: #0c0e12;
+  --accent-ink: #6fdd9c;
+  --border-hover: #3b4350;
+  --shadow-elevated: 0 24px 50px -28px rgba(0, 0, 0, 0.6);
+
+  --status-success-text: var(--accent-ink);
+  --status-success-bg: var(--bg-tint);
+  --status-success-dot: var(--frog-400);
+  --status-warning-text: #e5a93d;
+  --status-warning-bg: rgba(229, 169, 61, 0.15);
+  --status-warning-dot: #e5a93d;
+  --status-danger-text: #ef7468;
+  --status-danger-bg: rgba(239, 116, 104, 0.14);
+  --status-danger-dot: #ef7468;
+  --status-danger-border: rgba(239, 116, 104, 0.3);
+  --status-neutral-text: #8e939e;
+  --status-neutral-bg: #0f1217;
+  --status-neutral-dot: #5c626d;
+
+  --background: #0c0e12;
+  --foreground: #e3e6eb;
+  --card: #15181f;
+  --card-foreground: #e3e6eb;
+  --popover: #15181f;
+  --popover-foreground: #e3e6eb;
+
+  --primary: var(--frog-400);
+  --primary-foreground: #08120c;
+
+  --secondary: #232833;
+  --secondary-foreground: #e3e6eb;
+  --muted: #0f1217;
+  --muted-foreground: #8e939e;
+  --accent: #232833;
+  --accent-foreground: #e3e6eb;
+
+  --destructive: #ef7468;
+  --destructive-foreground: #08120c;
+
+  --border: #232833;
+  --input: #232833;
+  --ring: var(--frog-400);
+
+  color-scheme: dark;
+}
+
+/* ── Tailwind v4 theme registration: the ONE place the vars above become
+   utility classes (bg-primary, text-foreground, rounded-lg, font-mono, …). */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-frog-50: var(--frog-50);
+  --color-frog-100: var(--frog-100);
+  --color-frog-400: var(--frog-400);
+  --color-frog-500: var(--frog-500);
+  --color-frog-600: var(--frog-600);
+  --color-violet-100: var(--violet-100);
+  --color-violet-400: var(--violet-400);
+  --color-violet-500: var(--violet-500);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+  --color-ink-500: var(--ink-500);
+  --color-ink-700: var(--ink-700);
+  --color-ink-800: var(--ink-800);
+  --color-ink-900: var(--ink-900);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-paper: var(--paper);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Families are named directly; see this file's header comment. */
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased transition-colors duration-200;
+  }
+}
+
+::selection {
+  background: rgba(47, 174, 99, 0.22);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(122, 138, 128, 0.35);
+  border-radius: 6px;
+}

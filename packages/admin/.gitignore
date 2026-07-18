@@ -1,0 +1,4 @@
+# Vite's raw SPA build output. Not committed: only its embedded derivative,
+# src/generated/assets.ts (produced by scripts/embed.mjs), is, since that is
+# what the plugin's tsup build and any downstream consumer actually need.
+dist-spa/
