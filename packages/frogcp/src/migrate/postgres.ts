@@ -4,6 +4,7 @@ import type { DatabaseAdapter } from "../adapter";
 import { consoleLogger, type Logger } from "../observability/logger";
 import type { BackendConfig } from "../schema/types";
 import { compileTables } from "../compile/drizzle";
+import { drizzleKitUnavailable } from "./drizzle-kit";
 
 const MIGRATIONS_TABLE = "__frogcp_migrations";
 
@@ -40,8 +41,15 @@ export async function generatePostgresMigration(
   tables: Record<string, unknown>,
   previousSnapshot?: object,
 ): Promise<{ statements: string[]; snapshot: object }> {
-  const { generateDrizzleJson, generateMigration: diffPgSnapshots } =
-    (await import(DRIZZLE_KIT_API_SPECIFIER)) as typeof import("drizzle-kit/api");
+  // Only the import is guarded: an error thrown from inside drizzle-kit after
+  // it loads is a real migration failure and propagates untouched.
+  let drizzleKit: typeof import("drizzle-kit/api");
+  try {
+    drizzleKit = (await import(DRIZZLE_KIT_API_SPECIFIER)) as typeof import("drizzle-kit/api");
+  } catch (error) {
+    throw drizzleKitUnavailable(error);
+  }
+  const { generateDrizzleJson, generateMigration: diffPgSnapshots } = drizzleKit;
 
   // `previousSnapshot` round-trips through __frogcp_migrations as JSON; it is
   // always a DrizzleSnapshotJSON produced by generateDrizzleJson below, so the
