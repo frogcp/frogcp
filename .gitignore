@@ -6,3 +6,6 @@ coverage/
 .DS_Store
 *.sqlite
 *.sqlite-journal
+
+# `frogcp schema > schema.sql`, generated on demand by the examples README steps.
+schema.sql

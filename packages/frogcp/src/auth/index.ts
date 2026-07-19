@@ -22,14 +22,30 @@ const MIN_SECRET_LENGTH = 32;
 const DEFAULT_SESSION_TTL_SECONDS = 604800; // 7 days
 const DEFAULT_COOKIE_NAME = "frogcp_session";
 
+function assertSecretLength(secret: string): void {
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`authPlugin: "secret" must be at least ${MIN_SECRET_LENGTH} characters long`);
+  }
+}
+
+/**
+ * Produces the signing secret at boot instead of at construction. Exists for
+ * runtimes where the secret is not readable when the plugin list is built:
+ * Cloudflare Workers hands `env` (and so the secret) to the app only once a
+ * request arrives, and `frogcp schema` builds the plugin list purely to collect
+ * entities, with no secret in scope at all.
+ */
+export type AuthSecretResolver = () => string;
+
 export interface AuthPluginOptions {
   /**
-   * Shared HMAC (HS256) signing secret for session JWTs. Must be at least 32
-   * characters; `authPlugin()` throws synchronously at construction otherwise,
-   * so a weak secret fails at boot rather than silently issuing forgeable
-   * sessions.
+   * Shared HMAC (HS256) signing secret for session JWTs, or a resolver called
+   * once at boot to produce it. Must be at least 32 characters either way; a
+   * literal is checked synchronously at construction and a resolver's result at
+   * boot, so a weak secret fails before the backend serves a request rather than
+   * silently issuing forgeable sessions.
    */
-  secret: string;
+  secret: string | AuthSecretResolver;
   /** Registers the email/password routes (`/api/auth/register|login|logout|me`). Defaults to `true`. */
   emailPassword?: boolean;
   /**
@@ -78,24 +94,26 @@ export interface AuthPluginOptions {
  * enforces the same constraint at each call site, but that only fires on the
  * first auth hit; asserting here means a dialect mismatch fails at
  * `createBackend` time instead of 500ing on every login.
+ *
+ * The `SessionConfig` is assembled in `onBoot` rather than here, because a
+ * resolver-form `secret` cannot be read until then. Routes are mounted after
+ * every `onBoot` has run, so they always see a fully resolved config.
  */
 export function authPlugin(opts: AuthPluginOptions): FrogPlugin {
-  if (opts.secret.length < MIN_SECRET_LENGTH) {
-    throw new Error(`authPlugin: "secret" must be at least ${MIN_SECRET_LENGTH} characters long`);
-  }
+  if (typeof opts.secret === "string") assertSecretLength(opts.secret);
   if (opts.oauth !== undefined && !opts.baseUrl) {
     throw new Error('authPlugin: "baseUrl" is required when "oauth" is configured');
   }
 
-  const cfg: SessionConfig = {
-    secret: opts.secret,
-    ttlSeconds: opts.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS,
-    cookieName: opts.cookieName ?? DEFAULT_COOKIE_NAME,
-    secure: opts.secureCookies ?? false,
-  };
   const emailPassword = opts.emailPassword ?? true;
 
+  let cfg: SessionConfig | undefined;
   let identifyFn: ((req: Request) => Promise<Ctx>) | undefined;
+
+  function sessionConfig(): SessionConfig {
+    if (!cfg) throw new Error("unreachable: authPlugin builds its session config in onBoot, which runs before routes");
+    return cfg;
+  }
 
   return {
     name: "auth",
@@ -107,9 +125,18 @@ export function authPlugin(opts: AuthPluginOptions): FrogPlugin {
           `frogcp/auth currently requires the sqlite dialect (adapter dialect: "${kernelCtx.adapter.dialect}")`,
         );
       }
+      const secret = typeof opts.secret === "string" ? opts.secret : opts.secret();
+      assertSecretLength(secret);
+      cfg = {
+        secret,
+        ttlSeconds: opts.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS,
+        cookieName: opts.cookieName ?? DEFAULT_COOKIE_NAME,
+        secure: opts.secureCookies ?? false,
+      };
       identifyFn = makeIdentify(cfg, kernelCtx);
     },
     routes(app, kernelCtx) {
+      const cfg = sessionConfig();
       if (emailPassword) registerAuthRoutes(app, kernelCtx, cfg, opts.resetMailer ? { resetMailer: opts.resetMailer } : {});
       if (opts.oauth) {
         const baseUrl = opts.baseUrl;

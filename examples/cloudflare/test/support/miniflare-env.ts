@@ -1,4 +1,33 @@
+import { execFileSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Miniflare } from "miniflare";
+
+const exampleDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const frogcpBin = join(exampleDir, "..", "..", "packages", "frogcp", "dist", "cli", "index.js");
+
+/**
+ * Runs the real `frogcp schema` binary against this example's config, exactly
+ * as the README's deploy steps do, and applies the DDL to `d1`. The Worker
+ * ships with `migrate: false` because D1 cannot migrate itself, so this is the
+ * only way its schema ever gets created, in tests, in local dev, and in
+ * production alike.
+ *
+ * `AUTH_SECRET` is deliberately cleared: generating schema must never need a
+ * secret, and this asserts that stays true.
+ */
+export async function applyExampleSchema(d1: D1Database): Promise<void> {
+  const env = { ...process.env };
+  delete env.AUTH_SECRET;
+  const sql = execFileSync(process.execPath, [frogcpBin, "schema"], { cwd: exampleDir, encoding: "utf8", env });
+
+  // D1's `exec` splits on newlines, and drizzle-kit emits multi-line CREATE
+  // TABLE, so each statement goes through `prepare` instead.
+  for (const statement of sql.split(/;\s*\n/)) {
+    const trimmed = statement.trim().replace(/;$/, "");
+    if (trimmed) await d1.prepare(trimmed).run();
+  }
+}
 
 export interface MiniflareEnv {
   mf: Miniflare;

@@ -168,6 +168,33 @@ describe.skipIf(env === null)("createWorkerHandler with real D1/R2 bindings (min
     expect(bootedCtx?.storage).toBeDefined();
   });
 
+  it("accepts plugins as a function of the runtime, so a plugin can be wired from a binding or secret", async () => {
+    const workerEnv = { DB: env!.d1, GREETING: "from a binding" };
+    let seen: string | undefined;
+    const handler = createWorkerHandler({
+      config,
+      plugins: (ctx) => [
+        {
+          name: "reads-env",
+          onBoot() {
+            seen = ctx.env.GREETING as string;
+          },
+        } satisfies FrogPlugin,
+      ],
+      resolve: (e: typeof workerEnv) => ({ adapter: d1Adapter(e.DB) }),
+    });
+
+    const res = await handler.fetch(
+      new Request("https://worker.example/api/system/health"),
+      workerEnv,
+      fakeExecutionContext(),
+    );
+    expect(res.status).toBe(200);
+    // The Workers `env` is what the resolver sees, so a secret that only exists
+    // per request can still build a plugin.
+    expect(seen).toBe("from a binding");
+  });
+
   it("evicts a failed build so a later request against the same env gets a fresh attempt", async () => {
     const workerEnv = { DB: env!.d1 };
     let attempt = 0;
