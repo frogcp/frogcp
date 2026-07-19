@@ -92,8 +92,17 @@ against D1 at all, and warns the first time it swallows one. The consequence is
 real: **migrations are not atomic on D1.** A migration that fails partway
 leaves the earlier statements committed with no rollback.
 
-So for a D1 deployment, run migrations out of band with
-`wrangler d1 migrations` and pass `migrate: false`:
+So for a D1 deployment, apply the schema out of band and pass `migrate: false`.
+`frogcp schema` (see the [CLI guide](/guides/cli/)) prints the DDL for a fresh
+database, which is what a first deploy needs:
+
+```bash
+frogcp schema > schema.sql
+wrangler d1 execute my-db --remote --file schema.sql
+```
+
+For later changes, `wrangler d1 migrations` holds the versioned migration
+files. Either way the Worker itself does not migrate:
 
 ```ts
 export default createWorkerHandler<Env>({

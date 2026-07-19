@@ -8,6 +8,7 @@ import { deployCommand, detectStaticSite } from "./commands/deploy";
 import { generateCommand } from "./commands/generate";
 import { resourcesLsCommand, resourcesRmCommand, type ResourcesOptions } from "./commands/resources";
 import { runCommand, devCommand, type RunOptions } from "./commands/run";
+import { schemaCommand, SCHEMA_DIALECTS, type SchemaDialect, type SchemaOptions } from "./commands/schema";
 import { CliError } from "./errors";
 
 const USAGE = `frogcp: CLI for frogCP backends
@@ -15,6 +16,7 @@ const USAGE = `frogcp: CLI for frogCP backends
 Usage:
   frogcp create <name> [--template basic-node|cloudflare]
   frogcp generate [--config <path>] [--apply] [--db <path>]
+  frogcp schema [--config <path>] [--dialect sqlite|postgres]
   frogcp run [--config <path>] [--db <path>] [--port <n>] [--managed]
   frogcp dev [--config <path>] [--db <path>] [--port <n>] [--managed]
   frogcp deploy [dir] [--static|--worker] [--spa] [--config <path>] [--entry <path>] [--slug <slug>] [--api-key <key>] [--control-plane <url>]
@@ -24,7 +26,11 @@ Usage:
 Commands:
   create <name>   Scaffold a new frogCP project directory
   generate        Write frogcp.gen.d.ts and show/apply the pending migration
-  run             Boot frogcp.config.ts as a standalone server (production/staging)
+  schema          Print the full CREATE DDL for a fresh database to stdout,
+                  for runtimes that cannot migrate themselves (e.g. D1):
+                    frogcp schema > schema.sql
+                    wrangler d1 execute <db> --remote --file schema.sql
+  run           Boot frogcp.config.ts as a standalone server (production/staging)
   dev             Like run, but against a separate dev database; restart to
                   apply config changes (no file-watch yet, see the README)
   deploy [dir]    Deploy to a frogCP control plane: a Worker bundle, or a
@@ -40,6 +46,12 @@ Options for "generate":
   --config <path>   Path to frogcp.config.ts (default: ./frogcp.config.ts)
   --apply           Apply the migration instead of printing a dry run
   --db <path>       SQLite database file to migrate (required with --apply)
+
+Options for "schema":
+  --config <path>    Path to frogcp.config.ts (default: ./frogcp.config.ts).
+                     A config exporting an App (defineApp) also includes every
+                     plugin-contributed table, like auth's users
+  --dialect <name>   sqlite (default, covers D1) or postgres
 
 Options for "run" / "dev":
   --config <path>   Path to frogcp.config.ts (default: ./frogcp.config.ts)
@@ -77,7 +89,17 @@ Other:
 const BOOLEAN_FLAGS = new Set(["apply", "managed", "static", "worker", "spa"]);
 
 /** Flags that REQUIRE a following value token (`--config <path>`, etc.). */
-const VALUE_FLAGS = new Set(["config", "db", "template", "port", "entry", "slug", "api-key", "control-plane"]);
+const VALUE_FLAGS = new Set([
+  "config",
+  "db",
+  "dialect",
+  "template",
+  "port",
+  "entry",
+  "slug",
+  "api-key",
+  "control-plane",
+]);
 
 interface ParsedArgs {
   // Not `command?: string`: `exactOptionalPropertyTypes` would then reject
@@ -219,6 +241,27 @@ export async function main(argv: string[]): Promise<number> {
         if (typeof flags.config === "string") generateOptions.config = flags.config;
         if (typeof flags.db === "string") generateOptions.db = flags.db;
         await generateCommand(generateOptions);
+        return 0;
+      }
+      case "schema": {
+        if (positional.length > 0) {
+          throw new CliError(
+            `schema takes no positional arguments (got "${positional[0]}"). ` +
+              "Redirect the output instead: frogcp schema > schema.sql",
+          );
+        }
+        // Same incremental-build reasoning as "generate" above.
+        const schemaOptions: SchemaOptions = {};
+        if (typeof flags.config === "string") schemaOptions.config = flags.config;
+        if (typeof flags.dialect === "string") {
+          if (!(SCHEMA_DIALECTS as readonly string[]).includes(flags.dialect)) {
+            throw new CliError(
+              `Unknown dialect "${flags.dialect}". Valid dialects: ${SCHEMA_DIALECTS.join(", ")}.`,
+            );
+          }
+          schemaOptions.dialect = flags.dialect as SchemaDialect;
+        }
+        await schemaCommand(schemaOptions);
         return 0;
       }
       case "create": {

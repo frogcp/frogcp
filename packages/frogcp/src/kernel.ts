@@ -247,8 +247,13 @@ function parseDebugIdentityHeader(req: Request): Ctx {
  * Every plugin-contributed entity is frozen here, matching the leaf-level freeze
  * `defineBackend` applies to user entities, so the combined config is immutable
  * like a `defineBackend` result.
+ *
+ * Exported because the merged set, not `config.entities`, is what the schema
+ * actually is: tooling that compiles DDL outside a running backend (`frogcp
+ * schema`) has to merge the same way or it emits a schema missing every
+ * plugin's tables.
  */
-function mergeEntities(config: BackendConfig, plugins: FrogPlugin[]): Record<string, EntityDef> {
+export function mergePluginEntities(config: BackendConfig, plugins: FrogPlugin[]): Record<string, EntityDef> {
   const entities: Record<string, EntityDef> = { ...config.entities };
   for (const plugin of plugins) {
     if (!plugin.entities) continue;
@@ -263,7 +268,7 @@ function mergeEntities(config: BackendConfig, plugins: FrogPlugin[]): Record<str
 }
 
 /** The set of entity names every plugin contributes, independent of the
- * collision check (`mergeEntities` does that). Used to flag/strip plugin-owned
+ * collision check (`mergePluginEntities` does that). Used to flag/strip plugin-owned
  * entities in the schema-editing API (see `KernelContext.pluginEntityNames`). */
 function collectPluginEntityNames(plugins: FrogPlugin[]): ReadonlySet<string> {
   const names = new Set<string>();
@@ -396,7 +401,7 @@ export async function createBackend(opts: CreateBackendOptions): Promise<Backend
   }
 
   const pluginEntityNames = collectPluginEntityNames(plugins);
-  const entities = mergeEntities({ entities: userEntities }, plugins);
+  const entities = mergePluginEntities({ entities: userEntities }, plugins);
   const config: BackendConfig = Object.freeze({ entities: Object.freeze(entities) });
   validateConfig(config);
 
@@ -543,7 +548,7 @@ export async function createBackend(opts: CreateBackendOptions): Promise<Backend
     }
 
     const run = async (): Promise<void> => {
-      const mergedEntities = mergeEntities(newUserConfig, plugins);
+      const mergedEntities = mergePluginEntities(newUserConfig, plugins);
       const fullConfig: BackendConfig = Object.freeze({ entities: Object.freeze(mergedEntities) });
       validateConfig(fullConfig);
 
