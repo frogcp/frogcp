@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: "Every frogcp command and its flags: create, generate, run, dev, deploy, and resources."
+description: "Every frogcp command and its flags: create, generate, schema, run, dev, deploy, and resources."
 sidebar:
   order: 8
 ---
@@ -62,6 +62,38 @@ against.
 `--apply` is a boolean flag, so `frogcp generate --apply data.sqlite` is an
 error rather than quietly treating `data.sqlite` as the flag's value and doing
 a dry run.
+
+## schema
+
+```bash
+frogcp schema [--config <path>] [--dialect sqlite|postgres]
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--config <path>` | `./frogcp.config.ts` | Path to the config. |
+| `--dialect <name>` | `sqlite` | `sqlite` (which covers D1) or `postgres`. |
+
+Prints the full `CREATE` DDL for a **fresh** database, one semicolon-terminated
+statement per line, and nothing else. That is what makes it pipeable, and it is
+the answer for a runtime that cannot migrate itself because drizzle-kit is not
+available there, D1 above all:
+
+```bash
+frogcp schema > schema.sql
+wrangler d1 execute my-db --remote --file schema.sql
+```
+
+This is not an incremental migration: every statement is diffed against an
+empty baseline, so applying it to a database that already has tables fails. The
+`__frogcp_migrations` bookkeeping table is not part of the output either;
+`migrateToConfig` creates it on demand.
+
+Plugins contribute entities, and those tables are in the output too, as long as
+the config default-exports an App (`defineApp({ config, plugins })`) rather than
+a bare `defineBackend({ ... })`. It has to be: with auth wired, `users` comes
+from the plugin, and a `ref("users")` in your own entity is a foreign key into
+a table a config-only dump would never emit.
 
 ## run
 

@@ -42,20 +42,25 @@ export interface GenerateResult {
 
 /**
  * Loads a user's `frogcp.config.ts` at runtime via `jiti`, no build step
- * required. `jiti.import(path, { default: true })` transpiles the TS file on
- * the fly and unwraps its `default` export, which is what `defineBackend(...)`'s
- * `export default` produces.
+ * required, and hands back its raw `default` export.
+ * `jiti.import(path, { default: true })` transpiles the TS file on the fly and
+ * unwraps `default`, which is what `defineBackend(...)`'s `export default`
+ * produces. Shared with `frogcp schema`, which accepts a wider set of default
+ * exports and so does its own shape check.
  */
-export async function loadBackendConfig(configPath: string): Promise<BackendConfig> {
+export async function importConfigDefault(configPath: string): Promise<unknown> {
   const jiti = createJiti(import.meta.url);
-  let config: unknown;
   try {
-    config = await jiti.import<BackendConfig>(configPath, { default: true });
+    return await jiti.import(configPath, { default: true });
   } catch (error) {
     throw new CliError(
       `Failed to load config at ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+/** Narrows an already-loaded default export to a `BackendConfig`, or throws a `CliError` naming what is wrong. */
+export function assertBackendConfig(config: unknown, configPath: string): BackendConfig {
   if (!config || typeof config !== "object" || !("entities" in config)) {
     throw new CliError(
       `${configPath} must default-export a BackendConfig (the result of defineBackend({ ... })).`,
@@ -74,6 +79,11 @@ export async function loadBackendConfig(configPath: string): Promise<BackendConf
     );
   }
   return config as BackendConfig;
+}
+
+/** Loads `configPath` and requires its default export to be a `BackendConfig`. */
+export async function loadBackendConfig(configPath: string): Promise<BackendConfig> {
+  return assertBackendConfig(await importConfigDefault(configPath), configPath);
 }
 
 /**

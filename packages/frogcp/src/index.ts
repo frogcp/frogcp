@@ -58,7 +58,7 @@ export type { LogSink, MetricSink, SpanSink, AuditSink } from "./observability/s
 export type { LogRecord, MetricPoint, SpanData, AuditEvent } from "./observability/types";
 
 // Kernel / REST API exports
-export { createBackend } from "./kernel";
+export { createBackend, mergePluginEntities } from "./kernel";
 export type { Backend, CreateBackendOptions, FrogPlugin, FrogMiddleware, KernelContext } from "./kernel";
 export type { ApiVariables } from "./api/routes";
 
