@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import worker, { type Env } from "../src/worker";
-import { resetD1, tryStartMiniflareEnv } from "./support/miniflare-env";
+import { applyExampleSchema, resetD1, tryStartMiniflareEnv } from "./support/miniflare-env";
 
 const BASE = "https://worker.example";
 const TEST_SECRET = "test-secret-at-least-32-bytes-long!!";
@@ -69,14 +69,14 @@ async function register(env: Env, email: string, password: string): Promise<Regi
 async function setup(): Promise<{ env: Env; alice: RegisteredUser; bob: RegisteredUser }> {
   if (!mfEnv) throw new Error("unreachable: setup() only runs in tests gated on mfEnv");
   await resetD1(mfEnv.d1);
-  // Mirrors `.dev.vars` so the schema is created against the reset database,
-  // the same way `wrangler dev` does.
+  // The worker never migrates, so the schema comes from `frogcp schema`, the
+  // same path a deploy uses.
+  await applyExampleSchema(mfEnv.d1);
   const env: Env = {
     DB: mfEnv.d1,
     BUCKET: mfEnv.r2,
     SESSIONS: mfEnv.kv,
     AUTH_SECRET: TEST_SECRET,
-    FROGCP_MIGRATE: "true",
   };
 
   const alice = await register(env, "alice@example.com", "alice-password1");
@@ -106,9 +106,6 @@ it("accepts the dev placeholder secret when FROGCP_ALLOW_DEV_SECRET=1 is set, as
     SESSIONS: {},
     AUTH_SECRET: DEV_SECRET_LITERAL,
     FROGCP_ALLOW_DEV_SECRET: "1",
-    // The health route touches no bindings, so this test needs no real D1 as
-    // long as migration stays off.
-    FROGCP_MIGRATE: "false",
   } as unknown as Env;
   const res = await worker.fetch(req("/api/system/health"), env, fakeExecutionContext());
   expect(res.status).toBe(200);

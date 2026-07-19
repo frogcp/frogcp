@@ -31,9 +31,5 @@
   // Everything in `vars` is deployed verbatim on every `wrangler deploy`, so
   // AUTH_SECRET does not belong here. Use `wrangler secret put AUTH_SECRET`
   // for real deployments and `.dev.vars` for local dev.
-  //
-  // Leave FROGCP_MIGRATE unset here too: the worker defaults to `migrate:
-  // false` so deployed schema changes go through `wrangler d1 migrations`.
-  // See the README's "Migrations" section.
   "vars": {}
 }

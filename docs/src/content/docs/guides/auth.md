@@ -33,7 +33,7 @@ The plugin currently requires a SQLite-dialect adapter. It reads and writes
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `secret` | required | HS256 signing secret for session JWTs. Must be at least 32 characters; the factory throws otherwise. |
+| `secret` | required | HS256 signing secret for session JWTs, or a `() => string` resolver called once at boot. Must be at least 32 characters either way. |
 | `emailPassword` | `true` | Register the email/password routes. |
 | `oauth` | none | `{ github?, google?, oidc? }`, see [OAuth providers](#oauth-providers). |
 | `baseUrl` | none | Absolute base URL the backend is served from. Required when `oauth` is set, since redirect URIs are built from it. |
@@ -44,7 +44,27 @@ The plugin currently requires a SQLite-dialect adapter. It reads and writes
 | `oauthFetch` | `globalThis.fetch` | Overrides the `fetch` used for OAuth discovery, token exchange, and userinfo. Exists for tests. |
 
 Both guards run synchronously at construction, so a short secret or an OAuth
-config with no `baseUrl` fails before the process serves anything.
+config with no `baseUrl` fails before the process serves anything. A resolver
+`secret` is checked at boot instead, which is still before the backend serves a
+request.
+
+### Resolving the secret at boot
+
+Pass a function when the secret does not exist yet at the point the plugin list
+is built. On Cloudflare Workers it never does: the runtime hands over `env` only
+once a request arrives.
+
+```ts
+export default defineApp({
+  config,
+  plugins: (ctx) => [authPlugin({ secret: () => readSecret(ctx.env) })],
+});
+```
+
+The resolver runs once, at boot, and is never called during schema generation.
+That is what lets `frogcp schema` build the plugin list purely to collect
+entities, with no secret set anywhere. See the
+[cloudflare example](https://github.com/frogcp/frogcp/tree/main/examples/cloudflare).
 
 ## Email and password routes
 

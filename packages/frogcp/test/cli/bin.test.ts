@@ -1,5 +1,5 @@
 import { execFileSync, execSync, spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +38,19 @@ describe("frogcp bin", () => {
 
   it("`node dist/cli.js` with no args also prints usage and exits 0", () => {
     const output = execFileSync(process.execPath, [binPath], { encoding: "utf8" });
+    expect(output).toContain("Usage:");
+  });
+
+  it("runs when invoked through a symlink, the way a package manager's node_modules/.bin shim does", () => {
+    // pnpm's shim execs `node node_modules/frogcp/dist/cli/index.js`, which is
+    // a symlink into the workspace. Node resolves `import.meta.url` to the real
+    // path but leaves `process.argv[1]` as the symlink, so comparing the two
+    // literally makes the CLI exit 0 having done nothing at all.
+    const dir = mkdtempSync(join(tmpdir(), "frogcp-cli-bin-symlink-"));
+    const link = join(dir, "frogcp-link.js");
+    symlinkSync(binPath, link);
+
+    const output = execFileSync(process.execPath, [link, "--help"], { encoding: "utf8" });
     expect(output).toContain("Usage:");
   });
 

@@ -5,7 +5,6 @@ import {
   type BackendConfig,
   type CreateBackendOptions,
   type DatabaseAdapter,
-  type FrogPlugin,
   type RuntimeContext,
   type SessionStore,
   type StorageAdapter,
@@ -36,7 +35,12 @@ export interface WorkerBindings {
 
 export interface CreateWorkerHandlerOptions<Env> {
   config: BackendConfig;
-  plugins?: FrogPlugin[];
+  /**
+   * Plugins to compose in: a list, or a function of the runtime. The function
+   * form is what a plugin needing a binding or a secret has to use, since
+   * Workers only hands over `env` once a request arrives.
+   */
+  plugins?: App["plugins"];
   /** Pulls the concrete bindings (`d1Adapter(env.DB)`, `r2Storage(env.BUCKET)`) off the Workers `env` object for this deployment. */
   resolve: (env: Env) => WorkerBindings;
   identify?: CreateBackendOptions["identify"];

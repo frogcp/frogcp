@@ -42,6 +42,36 @@ export default defineApp({
 });
 `;
 
+/**
+ * The shape a Workers app has to use: the plugin list is a function of the
+ * runtime and the auth secret is lazy, because on Workers `env` only exists per
+ * request. `frogcp schema` must produce the full DDL from it without a secret in
+ * the environment at all.
+ */
+const APP_WITH_LAZY_AUTH_SECRET = `import { defineApp, defineBackend, entity, ref, text } from "frogcp";
+import { authPlugin } from "frogcp/auth";
+
+export default defineApp({
+  config: defineBackend({
+    entities: {
+      notes: entity({
+        title: text().required(),
+        owner: ref("users").onDelete("cascade"),
+      }),
+    },
+  }),
+  plugins: (ctx) => [
+    authPlugin({
+      secret: () => {
+        const secret = ctx.env.AUTH_SECRET;
+        if (typeof secret !== "string") throw new Error("AUTH_SECRET is not set");
+        return secret;
+      },
+    }),
+  ],
+});
+`;
+
 function writeConfig(source: string, prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   const configPath = join(dir, "frogcp.config.ts");
@@ -98,6 +128,24 @@ describe("schemaCommand", () => {
       expect(foreignKeys).toEqual(expect.arrayContaining([expect.objectContaining({ table: "users", from: "owner" })]));
     } finally {
       db?.close();
+      log.mockRestore();
+    }
+  });
+
+  it("compiles an app whose plugins are runtime-resolved and whose auth secret is lazy, with no secret set", async () => {
+    const configPath = writeConfig(APP_WITH_LAZY_AUTH_SECRET, "frogcp-cli-schema-lazy-");
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const previous = process.env.AUTH_SECRET;
+    delete process.env.AUTH_SECRET;
+    let db: DatabaseSync | undefined;
+    try {
+      const { sql } = await schemaCommand({ config: configPath });
+
+      db = applyToFreshDatabase(sql);
+      expect(tableNames(db)).toEqual(expect.arrayContaining(["notes", "users", "oauthAccounts"]));
+    } finally {
+      db?.close();
+      if (previous !== undefined) process.env.AUTH_SECRET = previous;
       log.mockRestore();
     }
   });

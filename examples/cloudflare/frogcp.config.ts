@@ -1,12 +1,11 @@
-import { defineBackend, entity, ref, role, rule, select, text, timestamp } from "frogcp";
+import { defineApp, defineBackend, entity, ref, role, rule, select, text, timestamp } from "frogcp";
+import { authPlugin } from "frogcp/auth";
+import { resolveAuthSecret } from "./src/env";
 
-// No `users` entity here: `authPlugin()` contributes its own (see src/worker.ts)
-// and the kernel merges plugin entities into this config at boot, so
-// `ref("users")` below resolves against that one.
-//
-// This file is identical to the basic-node example's. Only the adapter wiring
-// in the entry point differs between the two.
-export default defineBackend({
+// No `users` entity here: `authPlugin()` contributes its own and the kernel
+// merges plugin entities into this config at boot, so `ref("users")` below
+// resolves against that one.
+const config = defineBackend({
   entities: {
     notes: entity({
       title: text().required(),
@@ -22,4 +21,20 @@ export default defineBackend({
       delete: rule.owner("owner").or(role("admin")),
     }),
   },
+});
+
+/**
+ * The whole app, config plus plugins, in one declaration. `src/worker.ts` boots
+ * it and `frogcp schema` reads it, so the DDL applied to D1 can never drift
+ * from what the Worker actually serves.
+ *
+ * Both indirections here exist for the same reason: on Workers the session
+ * secret lives on `env`, which only exists once a request arrives. `plugins` is
+ * a function of the runtime so it can reach `env` at all, and the secret itself
+ * is a resolver so `frogcp schema` can build this plugin list purely to collect
+ * entities, with no secret set anywhere.
+ */
+export default defineApp({
+  config,
+  plugins: (ctx) => [authPlugin({ secret: () => resolveAuthSecret(ctx.env) })],
 });

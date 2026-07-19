@@ -11,13 +11,23 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm --filter example-cloudflare dev
+
+# Create the local D1 schema. `--local` targets the simulated database
+# `wrangler dev` uses, so this needs no Cloudflare account.
+cd examples/cloudflare
+pnpm exec frogcp schema > schema.sql
+pnpm exec wrangler d1 execute frogcp-example-notes --local --file schema.sql
+
+pnpm dev
 ```
 
 That runs `wrangler dev`, which serves the Worker on http://localhost:8787 with
 locally simulated D1, R2, and KV bindings. It works before you create any real
-Cloudflare resources. `.dev.vars` supplies a dev session secret and turns on
-automatic migration, so the schema is created on the first request.
+Cloudflare resources. `.dev.vars` supplies a dev session secret.
+
+Local dev gets its schema exactly the way production does. There is no
+auto-migrate mode to fall out of, so nothing works here that would break on
+deploy.
 
 ## Try it
 
@@ -37,18 +47,52 @@ curl -X POST http://localhost:8787/api/entity/notes \
 
 ## What it shows
 
-`src/worker.ts` wires `createWorkerHandler` with `d1Adapter` for the database,
-`r2Storage` for uploads, and `kvSessionStore`, all from
-`frogcp/adapter/cloudflare`, plus `authPlugin` for `/api/auth/*`. Entity CRUD
-lives at `/api/entity/notes`.
+`frogcp.config.ts` default-exports the whole app: `defineApp({ config, plugins })`,
+with the `notes` entity, its permissions, and `authPlugin` for `/api/auth/*`.
+`src/worker.ts` boots that app and `frogcp schema` reads it, so the DDL applied
+to D1 cannot drift from what the Worker serves.
 
-Bindings only exist once a request arrives, never at module scope, so the
-handler is built lazily on the first request and cached per `env` object.
+Bindings only exist once a request arrives, never at module scope. The app
+handles that with two seams: `plugins` is a function of the runtime, so it can
+reach `env` at all, and `authPlugin`'s `secret` is a resolver, so `frogcp schema`
+can build the plugin list purely to collect entities with no secret set
+anywhere. `createWorkerHandler` builds the backend on the first request and
+caches it per `env` object.
 
-`frogcp.config.ts` defines the `notes` entity and its permissions. Because
-`read` is owner scoped, one member cannot read another member's note, and the
-API answers `404` rather than `403` so it never confirms the row exists. An
-admin bypasses the rule and can read any of them.
+`src/worker.ts` wires `d1Adapter` for the database, `r2Storage` for uploads, and
+`kvSessionStore`, all from `frogcp/adapter/cloudflare`. Entity CRUD lives at
+`/api/entity/notes`.
+
+Because `read` is owner scoped, one member cannot read another member's note,
+and the API answers `404` rather than `403` so it never confirms the row exists.
+An admin bypasses the rule and can read any of them.
+
+## Schema
+
+The worker ships with `migrate: false` and there is no way to turn that on.
+Automatic migration cannot work on a deployed Worker at all: drizzle-kit is
+deliberately excluded from Workers bundles, so `migrate: true` would fail on
+every request in production even though it appears to work under `wrangler dev`.
+
+Schema is applied out of band instead. `frogcp schema` prints the full CREATE
+DDL for a fresh database to stdout, and nothing else, so it pipes straight into
+a file:
+
+```bash
+pnpm exec frogcp schema > schema.sql
+pnpm exec wrangler d1 execute frogcp-example-notes --remote --file schema.sql
+```
+
+Drop `--remote` for the local `wrangler dev` database. The output includes the
+`users` and `oauthAccounts` tables that `authPlugin` contributes, not just
+`notes`, because the config exports a `defineApp` that carries the plugin list.
+That is what makes `notes.owner`'s foreign key into `users` resolve.
+
+For a schema change after the first deploy, `frogcp schema` still emits the
+fresh-database DDL, so write the incremental `ALTER` yourself and apply it with
+`wrangler d1 migrations`. Note that D1 has no client-visible multi-statement
+transaction, so a migration that fails partway leaves the statements that
+already ran permanently committed, with no rollback.
 
 ## Deploying
 
@@ -64,7 +108,14 @@ admin bypasses the rule and can read any of them.
    `wrangler.jsonc` over the `REPLACE_WITH_YOUR_...` placeholders. R2 buckets
    are addressed by name and need no id.
 
-2. Set the session secret:
+2. Apply the schema:
+
+   ```bash
+   pnpm exec frogcp schema > schema.sql
+   pnpm exec wrangler d1 execute frogcp-example-notes --remote --file schema.sql
+   ```
+
+3. Set the session secret:
 
    ```bash
    wrangler secret put AUTH_SECRET
@@ -77,27 +128,11 @@ admin bypasses the rule and can read any of them.
    `FROGCP_ALLOW_DEV_SECRET=1` is set alongside it, so a stray copy of that
    value fails loudly instead of signing forgeable sessions.
 
-3. Deploy:
+4. Deploy:
 
    ```bash
-   pnpm --filter example-cloudflare deploy
+   wrangler deploy
    ```
-
-## Migrations
-
-The worker ships with `migrate: false`, so a deploy never migrates D1 on its
-own. D1 has no client-visible multi-statement transaction, which means a
-migration that fails partway leaves the statements that already ran permanently
-committed, with no rollback. Manage schema with Cloudflare's own tooling:
-
-```bash
-wrangler d1 migrations create frogcp-example-notes <name>
-# write the SQL for that migration, then:
-wrangler d1 migrations apply frogcp-example-notes --remote
-```
-
-Local dev opts back in through `FROGCP_MIGRATE=true` in `.dev.vars`, which is
-never deployed. Leave that variable out of `wrangler.jsonc`.
 
 ## Sessions
 
@@ -115,8 +150,10 @@ pnpm --filter example-cloudflare test
 
 `test/e2e.test.ts` boots this example's actual worker against real D1, R2, and
 KV bindings from Miniflare, not mocks, and drives it the way a deployed Worker
-would be. The secret-handling tests need no bindings and always run; the rest
-skip, loudly, if workerd cannot start.
+would be. It creates the schema by running the real `frogcp schema` binary
+against this example's config, so the tests exercise the same path the deploy
+steps above document. The secret-handling tests need no bindings and always run;
+the rest skip, loudly, if workerd cannot start.
 
 `test/wrangler-bundle.test.ts` runs `wrangler deploy --dry-run` against this
 example for real, checking that the whole app bundles for Workers. It skips only

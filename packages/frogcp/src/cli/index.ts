@@ -1,8 +1,8 @@
 /// <reference types="node" />
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { createCommand, TEMPLATES, type Template } from "./commands/create";
 import { deployCommand, detectStaticSite } from "./commands/deploy";
 import { generateCommand } from "./commands/generate";
@@ -381,10 +381,26 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+/**
+ * True when this module is the process entry point rather than an import.
+ *
+ * Both sides are resolved through `realpathSync` because a package manager's
+ * `node_modules/.bin` shim execs the symlinked path while Node reports
+ * `import.meta.url` as the real one. Comparing them literally makes the CLI
+ * exit 0 without running anything whenever it is invoked as an installed bin,
+ * which is every invocation that is not `node path/to/dist/cli/index.js`.
+ */
+function invokedDirectly(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(entry);
+  } catch {
+    return false;
+  }
+}
 
-if (invokedDirectly) {
+if (invokedDirectly()) {
   const code = await main(process.argv.slice(2));
   process.exitCode = code;
 }
