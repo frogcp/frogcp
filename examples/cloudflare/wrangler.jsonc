@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "frogcp-example-cloudflare",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-01",
+
+  // The resource ids below are placeholders. `wrangler dev` works with them as
+  // is, because Miniflare simulates the bindings locally, but a real
+  // `wrangler deploy` needs the ids that the `wrangler ... create` commands in
+  // the README print.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "frogcp-example-notes",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "frogcp-example-notes"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+    }
+  ],
+
+  // Everything in `vars` is deployed verbatim on every `wrangler deploy`, so
+  // AUTH_SECRET does not belong here. Use `wrangler secret put AUTH_SECRET`
+  // for real deployments and `.dev.vars` for local dev.
+  //
+  // Leave FROGCP_MIGRATE unset here too: the worker defaults to `migrate:
+  // false` so deployed schema changes go through `wrangler d1 migrations`.
+  // See the README's "Migrations" section.
+  "vars": {}
+}

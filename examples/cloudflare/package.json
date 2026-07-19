@@ -1,0 +1,23 @@
+{
+  "name": "example-cloudflare",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "node scripts/ensure-deps-built.mjs && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "frogcp": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260706.1",
+    "@types/node": "^26.1.0",
+    "miniflare": "^4.20260701.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9",
+    "wrangler": "^4.107.0"
+  }
+}
