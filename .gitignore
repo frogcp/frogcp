@@ -9,3 +9,8 @@ coverage/
 
 # `frogcp schema > schema.sql`, generated on demand by the examples README steps.
 schema.sql
+
+# Written and removed by examples/cloudflare/scripts/live-verify.sh. Ignored so
+# an interrupted run cannot leave them staged.
+wrangler.livetest*.jsonc
+worker.migratecheck.ts
