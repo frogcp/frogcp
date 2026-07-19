@@ -158,3 +158,29 @@ the rest skip, loudly, if workerd cannot start.
 `test/wrangler-bundle.test.ts` runs `wrangler deploy --dry-run` against this
 example for real, checking that the whole app bundles for Workers. It skips only
 if the `wrangler` binary is missing, which it is not in this workspace.
+
+## Live verification
+
+`scripts/live-verify.sh` checks the same ground against the real platform, which
+Miniflare cannot: it deploys this example to Cloudflare and drives it over public
+HTTPS. It verifies that forcing `migrate: true` on a deployed Worker fails with
+the actionable error rather than a raw module-resolution failure, that
+`frogcp schema` emits DDL that includes the auth plugin's tables, omits the
+migrations bookkeeping table and applies to remote D1 in one shot, then makes
+fourteen behavioural assertions (health, first user becomes admin, owner-scoped
+list isolation, anonymous denial, cross-user 404s, login, delete), and finally
+confirms the rows landed in D1 with passwords hashed at rest.
+
+```bash
+export CLOUDFLARE_API_TOKEN=...
+export CLOUDFLARE_ACCOUNT_ID=...
+bash examples/cloudflare/scripts/live-verify.sh
+```
+
+It creates a throwaway Worker, D1 database and KV namespace, and deletes them
+all through an exit trap. These are **real billable resources on your account**,
+so run it deliberately. Set `LIVE_VERIFY_NAME` to something other than
+`frogcp-livetest` if you need two runs at once.
+
+It is a manual tool and deliberately not part of `pnpm test` or CI: it needs
+credentials and touches a real account, so it cannot run on a pull request.
