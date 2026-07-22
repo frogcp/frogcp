@@ -30,7 +30,7 @@ CFG="$EX/wrangler.livetest.jsonc"
 CFG_M="$EX/wrangler.livetest-migrate.jsonc"
 WORKER_M="$EX/src/worker.migratecheck.ts"
 
-PASS=0; FAIL=0; D1_ID=""; KV_ID=""
+PASS=0; FAIL=0; D1_ID=""; KV_ID=""; R2_NAME=""
 
 ok()  { PASS=$((PASS+1)); printf '  PASS  %s\n' "$1"; }
 bad() { FAIL=$((FAIL+1)); printf '  FAIL  %s\n     expected: %s\n     actual:   %s\n' "$1" "$2" "${3:0:400}"; }
@@ -44,6 +44,7 @@ cleanup() {
   [ -f "$CFG" ]   && "$W" delete --config "$CFG"   >/dev/null 2>&1 && echo "  worker deleted"
   [ -n "$D1_ID" ] && "$W" d1 delete "$NAME-db" -y >/dev/null 2>&1 && echo "  d1 deleted"
   [ -n "$KV_ID" ] && "$W" kv namespace delete --namespace-id "$KV_ID" >/dev/null 2>&1 && echo "  kv deleted"
+  [ -n "$R2_NAME" ] && "$W" r2 bucket delete "$R2_NAME" >/dev/null 2>&1 && echo "  r2 deleted"
   rm -f "$CFG" "$CFG_M" "$WORKER_M"
   rm -rf "$TMP"
   echo ""
@@ -103,6 +104,7 @@ write_cfg() {  # write_cfg <path> <worker-name> <entry>
   "workers_dev": true,
   "d1_databases": [{ "binding": "DB", "database_name": "$NAME-db", "database_id": "$D1_ID" }],
   "kv_namespaces": [{ "binding": "SESSIONS", "id": "$KV_ID" }],
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "$R2_NAME" }],
   "vars": {}
 }
 EOF
@@ -120,8 +122,11 @@ SECRET=$(openssl rand -hex 24)
 echo "=== provision ==="
 D1_ID=$("$W" d1 create "$NAME-db" 2>&1 | grep -o '"database_id": "[^"]*"' | cut -d'"' -f4)
 KV_ID=$("$W" kv namespace create livetest 2>&1 | grep -o '"id": "[^"]*"' | cut -d'"' -f4)
-[ -n "$D1_ID" ] && [ -n "$KV_ID" ] || { echo "provisioning failed"; exit 1; }
-echo "  d1 and kv created"
+# R2 buckets are addressed by name, so a successful create is all we record. The
+# non-empty R2_NAME both flags it for teardown and feeds write_cfg's binding.
+if "$W" r2 bucket create "$NAME-media" >/dev/null 2>&1; then R2_NAME="$NAME-media"; fi
+[ -n "$D1_ID" ] && [ -n "$KV_ID" ] && [ -n "$R2_NAME" ] || { echo "provisioning failed"; exit 1; }
+echo "  d1, kv and r2 created"
 
 # --- Phase 1 -----------------------------------------------------------------
 # Forcing migration on a deployed Worker must explain itself rather than failing
@@ -246,3 +251,26 @@ ROWS=$("$W" d1 execute "$NAME-db" --remote --config "$CFG" -y --json \
 has "both users persisted in D1"   "$ROWS" '"u": 2'
 has "delete persisted in D1"       "$ROWS" '"n": 0'
 has "passwords are hashed at rest" "$ROWS" 'scrypt'
+
+# --- Phase 5 -----------------------------------------------------------------
+# The media plugin, backed by real R2. Reuses alice's authenticated cookie jar
+# from phase 3 to upload a file, then proves the bytes round-trip, a guest
+# cannot upload, and a second user cannot download someone else's file.
+echo ""
+echo "=== phase 5: media over real R2 ==="
+
+MEDIA_FILE="$TMP/upload.txt"
+printf 'frog bytes over r2' > "$MEDIA_FILE"
+
+R=$(req -b "$TMP/a.cookies" -X POST "$BASE/api/media/upload" -F "file=@$MEDIA_FILE")
+U=$(body "$R")
+is "authenticated upload succeeds" "$(status "$R")" "200"
+has "upload returns a key"         "$U" '"key":"'
+KEY=$(printf '%s' "$U" | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
+
+R=$(req -b "$TMP/a.cookies" "$BASE/files/$KEY")
+is "owner downloads the file"   "$(status "$R")" "200"
+is "downloaded bytes round-trip" "$(body "$R")" "frog bytes over r2"
+
+is "guest upload denied"        "$(status "$(req -X POST "$BASE/api/media/upload" -F "file=@$MEDIA_FILE")")" "403"
+is "cross-user download is 404" "$(status "$(req -b "$TMP/b.cookies" "$BASE/files/$KEY")")" "404"

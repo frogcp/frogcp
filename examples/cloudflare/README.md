@@ -48,9 +48,9 @@ curl -X POST http://localhost:8787/api/entity/notes \
 ## What it shows
 
 `frogcp.config.ts` default-exports the whole app: `defineApp({ config, plugins })`,
-with the `notes` entity, its permissions, and `authPlugin` for `/api/auth/*`.
-`src/worker.ts` boots that app and `frogcp schema` reads it, so the DDL applied
-to D1 cannot drift from what the Worker serves.
+with the `notes` entity, its permissions, `authPlugin` for `/api/auth/*`, and
+`mediaPlugin` for file uploads. `src/worker.ts` boots that app and `frogcp schema`
+reads it, so the DDL applied to D1 cannot drift from what the Worker serves.
 
 Bindings only exist once a request arrives, never at module scope. The app
 handles that with two seams: `plugins` is a function of the runtime, so it can
@@ -66,6 +66,32 @@ caches it per `env` object.
 Because `read` is owner scoped, one member cannot read another member's note,
 and the API answers `404` rather than `403` so it never confirms the row exists.
 An admin bypasses the rule and can read any of them.
+
+## Media
+
+`mediaPlugin` adds file uploads, backed by the R2 bucket that `src/worker.ts`
+wires through `r2Storage(env.BUCKET)`. The bytes live in R2; a `media_files` row
+in D1 records the key, filename, content type, size, and owner.
+
+Upload a file with a multipart POST, using the `file` form field. Uploading
+requires a logged-in caller, so send the auth cookie:
+
+```bash
+curl -X POST http://localhost:8787/api/media/upload \
+  -H 'cookie: <paste>' -F file=@./photo.png
+```
+
+The response returns the storage `key`. Download it from the short, shareable
+URL:
+
+```bash
+curl http://localhost:8787/files/<key>
+```
+
+Reads are owner scoped too, so one member cannot fetch another's file, and a
+missing or denied key both answer `404`. A type the browser would render as a
+document (`text/html`, and the like) is served as an attachment with `nosniff`,
+never inline, so an upload cannot run script on the origin.
 
 ## Schema
 
@@ -84,9 +110,10 @@ pnpm exec wrangler d1 execute frogcp-example-notes --remote --file schema.sql
 ```
 
 Drop `--remote` for the local `wrangler dev` database. The output includes the
-`users` and `oauthAccounts` tables that `authPlugin` contributes, not just
-`notes`, because the config exports a `defineApp` that carries the plugin list.
-That is what makes `notes.owner`'s foreign key into `users` resolve.
+`users` and `oauthAccounts` tables that `authPlugin` contributes and the
+`media_files` table that `mediaPlugin` contributes, not just `notes`, because the
+config exports a `defineApp` that carries the plugin list. That is what makes
+`notes.owner`'s foreign key into `users` resolve.
 
 For a schema change after the first deploy, `frogcp schema` still emits the
 fresh-database DDL, so write the incremental `ALTER` yourself and apply it with
@@ -168,8 +195,10 @@ the actionable error rather than a raw module-resolution failure, that
 `frogcp schema` emits DDL that includes the auth plugin's tables, omits the
 migrations bookkeeping table and applies to remote D1 in one shot, then makes
 fourteen behavioural assertions (health, first user becomes admin, owner-scoped
-list isolation, anonymous denial, cross-user 404s, login, delete), and finally
-confirms the rows landed in D1 with passwords hashed at rest.
+list isolation, anonymous denial, cross-user 404s, login, delete), exercises a
+real file upload and download through R2 (upload, exact byte round-trip, guest
+denial, cross-user 404), and finally confirms the rows landed in D1 with
+passwords hashed at rest.
 
 ```bash
 export CLOUDFLARE_API_TOKEN=...
@@ -177,8 +206,8 @@ export CLOUDFLARE_ACCOUNT_ID=...
 bash examples/cloudflare/scripts/live-verify.sh
 ```
 
-It creates a throwaway Worker, D1 database and KV namespace, and deletes them
-all through an exit trap. These are **real billable resources on your account**,
+It creates a throwaway Worker, D1 database, KV namespace and R2 bucket, and
+deletes them all through an exit trap. These are **real billable resources on your account**,
 so run it deliberately. Set `LIVE_VERIFY_NAME` to something other than
 `frogcp-livetest` if you need two runs at once.
 
