@@ -48,6 +48,27 @@ interface RegisteredUser {
   role: string;
 }
 
+/**
+ * Uploads a file through the media plugin's multipart endpoint. `cookie` is
+ * optional so the same helper covers the guest-denied case. The body is a real
+ * `FormData` with a `file` field, exactly what a browser or `curl -F` sends.
+ */
+function upload(
+  env: Env,
+  filename: string,
+  contentType: string,
+  content: string,
+  cookie?: string,
+): Promise<Response> {
+  const form = new FormData();
+  form.append("file", new File([content], filename, { type: contentType }));
+  return worker.fetch(
+    req("/api/media/upload", { method: "POST", body: form, ...(cookie ? { headers: { cookie } } : {}) }),
+    env,
+    fakeExecutionContext(),
+  );
+}
+
 async function register(env: Env, email: string, password: string): Promise<RegisteredUser> {
   const res = await worker.fetch(
     jsonReq("POST", "/api/auth/register", { email, password }),
@@ -218,6 +239,68 @@ describe.skipIf(mfEnv === null)("cloudflare worker example over real D1, R2, and
     const aliceReadsBobBody = (await aliceReadsBob.json()) as { data: { id: string; title: string } };
     expect(aliceReadsBobBody.data.id).toBe(bobNote.data.id);
     expect(aliceReadsBobBody.data.title).toBe("bob's note");
+  });
+
+  it("lets a member upload a file and read its exact bytes back", async () => {
+    const { env, bob } = await setup();
+
+    const uploadRes = await upload(env, "hello.txt", "text/plain", "hello media", bob.cookie);
+    expect(uploadRes.status).toBe(200);
+    const uploaded = (await uploadRes.json()) as { data: { key: string; filename: string; contentType: string } };
+    expect(uploaded.data.filename).toBe("hello.txt");
+    expect(uploaded.data.key).toMatch(/\.txt$/);
+
+    const getRes = await worker.fetch(
+      req(`/files/${uploaded.data.key}`, { headers: { cookie: bob.cookie } }),
+      env,
+      fakeExecutionContext(),
+    );
+    expect(getRes.status).toBe(200);
+    expect(getRes.headers.get("content-type")).toBe("text/plain");
+    expect(await getRes.text()).toBe("hello media");
+  });
+
+  it("serves a text/html upload as an attachment, never inline", async () => {
+    const { env, bob } = await setup();
+
+    const uploadRes = await upload(env, "page.html", "text/html", "<script>alert(1)</script>", bob.cookie);
+    expect(uploadRes.status).toBe(200);
+    const uploaded = (await uploadRes.json()) as { data: { key: string } };
+
+    const getRes = await worker.fetch(
+      req(`/files/${uploaded.data.key}`, { headers: { cookie: bob.cookie } }),
+      env,
+      fakeExecutionContext(),
+    );
+    expect(getRes.status).toBe(200);
+    expect(getRes.headers.get("content-disposition")).toBe("attachment");
+    expect(getRes.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("hides one member's file from another with a 404, no existence oracle", async () => {
+    const { env, alice, bob } = await setup();
+
+    const uploadRes = await upload(env, "secret.txt", "text/plain", "alice's bytes", alice.cookie);
+    expect(uploadRes.status).toBe(200);
+    const uploaded = (await uploadRes.json()) as { data: { key: string } };
+
+    const bobReads = await worker.fetch(
+      req(`/files/${uploaded.data.key}`, { headers: { cookie: bob.cookie } }),
+      env,
+      fakeExecutionContext(),
+    );
+    expect(bobReads.status).toBe(404);
+    const body = (await bobReads.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("data");
+  });
+
+  it("denies a file upload from a guest with a 403", async () => {
+    const { env } = await setup();
+
+    const res = await upload(env, "nope.txt", "text/plain", "guest bytes");
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("forbidden");
   });
 
   it("builds a separate handler for each distinct env object", async () => {

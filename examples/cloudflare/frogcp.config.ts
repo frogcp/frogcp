@@ -1,5 +1,6 @@
 import { defineApp, defineBackend, entity, ref, role, rule, select, text, timestamp } from "frogcp";
 import { authPlugin } from "frogcp/auth";
+import { mediaPlugin } from "frogcp/media";
 import { resolveAuthSecret } from "./src/env";
 
 // No `users` entity here: `authPlugin()` contributes its own and the kernel
@@ -36,5 +37,8 @@ const config = defineBackend({
  */
 export default defineApp({
   config,
-  plugins: (ctx) => [authPlugin({ secret: () => resolveAuthSecret(ctx.env) })],
+  // `mediaPlugin()` keeps its defaults: uploads require a logged-in caller and
+  // read/delete are owner scoped, so files stay private. It stores bytes through
+  // the `r2Storage` adapter `src/worker.ts` wires, exercising the R2 binding.
+  plugins: (ctx) => [authPlugin({ secret: () => resolveAuthSecret(ctx.env) }), mediaPlugin()],
 });
